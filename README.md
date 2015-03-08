@@ -1,5 +1,4 @@
 # dynaconfig
-Centralized Configuration Service
 
 Configuration is hard so make it somewhat easier by adding a layer of abstraction into your stack.
 
