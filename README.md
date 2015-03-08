@@ -30,7 +30,8 @@ Output:
             "changes": [
                 {
                     "action": "added",
-                    "key": "test"
+                    "key": "test",
+                    "value": 1
                 }
             ],
             "created_at": "Sun Mar 08 2015 05:41:10 GMT+00:00",
@@ -71,11 +72,13 @@ Output:
             "changes": [
                 {
                     "action": "removed",
-                    "key": "test"
+                    "key": "test",
+                    "value": 1
                 },
                 {
                     "action": "added",
-                    "key": "hello"
+                    "key": "hello",
+                    "value": "world"
                 }
             ],
             "created_at": "Sun Mar 08 2015 05:46:14 GMT+00:00",
