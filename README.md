@@ -94,3 +94,7 @@ Output:
 ```
 
 As you can see the audit log was updated with the changes and the values reflect the updated configuration.
+
+# Tips
+
+We recommend running this service within something similar to `guinicorn`. The other consideration is that this service could live on many different nodes being that all of the heavy lifting is performed inside of RethinkDB currently. We plan on adding authentication very soon.
