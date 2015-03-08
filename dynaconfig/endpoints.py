@@ -106,7 +106,7 @@ class ConfigValues(Resource):
     new_keys = set(new_values.keys()).difference(set(old_values))
 
     for k in new_keys:
-      audit_values.append({"key": k, "action": "added"})
+      audit_values.append({"key": k, "action": "added", "value": new_keys[k]})
 
     return {"created_at": r.now(), "changes": audit_values, "version": version}
 
