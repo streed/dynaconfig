@@ -1,0 +1,11 @@
+aniso8601==0.92
+Flask==0.10.1
+Flask-RESTful==0.3.2
+Flask-RethinkDB==0.2
+itsdangerous==0.24
+Jinja2==2.7.3
+MarkupSafe==0.23
+pytz==2014.10
+rethinkdb==1.16.0.post2
+six==1.9.0
+Werkzeug==0.10.1
