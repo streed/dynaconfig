@@ -45,11 +45,13 @@ class ConfigValues(Resource):
     values = request.json
 
     response = r.table("config").get_all("{}-{}".format(user_id, config_name), index="name").run(db.conn)
+    response = list(response)
   
     if response:
-      config = response.next()
+      config = response[0]
       config["highest_version"] = config["highest_version"] + 1
       current_version = config["highest_version"]
+
 
       old_values = r.table("config_values").get_all("{}-{}".format(user_id, config_name), index="config_id").run(db.conn)
 
@@ -60,10 +62,10 @@ class ConfigValues(Resource):
       if not old_values:
         old_values = []
       else:
-        old_values = old_values[0]
-        _id = old_values["id"]
-        old_audit = old_values["audit_trail"]
-        old_values = old_values["values"]
+        old_config = old_values[0]
+        _id = old_config["id"]
+        old_audit = old_config["audit_trail"]
+        old_values = old_config["values"]
 
       if not _id:
         response = r.table("config_values").insert({
@@ -78,8 +80,13 @@ class ConfigValues(Resource):
           old_audit.append(new_audit)
           response = r.table("config_values").get(_id).update({
             "version": current_version,
-            "values": values,
+            "values": r.literal(values),
             "audit_trail": old_audit
+          }).run(db.conn)
+
+          r.table("config").get_all("{}-{}".format(user_id, config_name), index="name").update({
+            "highest_version": r.row["highest_version"] + 1,
+            "current_version": r.row["highest_version"] + 1
           }).run(db.conn)
         else:
           return "No Change"
