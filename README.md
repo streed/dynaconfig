@@ -82,7 +82,7 @@ Output:
                 }
             ],
             "created_at": "Sun Mar 08 2015 05:46:14 GMT+00:00",
-            "version": 1
+            "version": 2
         }
     ],
     "config_id": "1-test",
@@ -90,7 +90,7 @@ Output:
     "values": {
         "hello": "world"
     },
-    "version": 1
+    "version": 2
 }
 ```
 
