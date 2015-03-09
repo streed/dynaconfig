@@ -44,14 +44,10 @@ class ConfigValues(Resource):
   def post(self, user_id, config_name):
     values = request.json
 
-    response = r.table("config").get_all("{}-{}".format(user_id, config_name), index="name").run(db.conn)
-    response = list(response)
-  
-    if response:
-      config = response[0]
-      config["highest_version"] = config["highest_version"] + 1
-      current_version = config["highest_version"]
+    response = r.table("config").get("{}-{}".format(user_id, config_name), index="name").run(db.conn)
 
+    if response:
+      current_version = response["highest_version"]
 
       old_values = r.table("config_values").get_all("{}-{}".format(user_id, config_name), index="config_id").run(db.conn)
       old_values = list(old_values)
@@ -75,7 +71,7 @@ class ConfigValues(Resource):
         }).run(db.conn)
       else:
         new_audit = self._create_audit(old_values, values, current_version)
-        if len(new_audit["changes"]) > 0:
+        if new_audit["changes"]:
           old_audit.append(new_audit)
           response = r.table("config_values").get(_id).update({
             "version": current_version,
