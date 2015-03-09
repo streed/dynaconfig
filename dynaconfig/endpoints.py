@@ -6,6 +6,8 @@ from flask.ext.restful import Resource, abort
 
 from dynaconfig import db
 
+from time import time
+
 class Config(Resource):
 
   def get(self, user_id, config_name):
@@ -62,10 +64,10 @@ class Config(Resource):
 
     for k in new_keys:
       audit_values.append({
-        "key": k, 
-        "action": "added", 
+        "key": k,
+        "action": "added",
         "value": new_values[k]
       })
 
-    return {"created_at": r.now(), "changes": audit_values, "version": version}
+    return {"created_at": int(time() * 1000), "changes": audit_values, "version": version}
 
