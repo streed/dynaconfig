@@ -9,84 +9,44 @@ from dynaconfig import db
 class Config(Resource):
 
   def get(self, user_id, config_name):
-    config = r.table("config").get_all("{}-{}".format(user_id, config_name), index="name").run(db.conn)
-    return config.next()
+    current_config = list(r.table("config").get_all("{}-{}".format(user_id, config_name), index="name").run(db.conn))
 
-  def post(self, user_id, config_name):
-    config = self._default_values(user_id, config_name)
-    response = r.table("config").insert(config).run(db.conn)
-
-    if response["inserted"] < 1:
-      abort(500, "Could not create config with name '{}'".format(config_name))
-    else:
-      config["id"] = response["generated_keys"][0]
-
-      return config
-
-
-
-  def _validate_config(self, json):
-    return "name" in json
-
-  def _default_values(self, user_id, config_name):
-    _config = {}
-    _config["name"] = "{}-{}".format(user_id, config_name)
-    _config["current_version"] = 0
-    _config["last_version"] = 0
-    _config["highest_version"] = 0
-    return _config
-
-class ConfigValues(Resource):
-
-  def get(self, user_id, config_name):
-    pass
+    if current_config:
+      return current_config[0]
 
   def post(self, user_id, config_name):
     values = request.json
 
-    response = r.table("config").get("{}-{}".format(user_id, config_name), index="name").run(db.conn)
+    current_config = list(r.table("config").get_all("{}-{}".format(user_id, config_name), index="name").run(db.conn))
+    if current_config:
+      current_config = current_config[0]
+      old_audit = current_config["values"]
 
-    if response:
-      current_version = response["highest_version"]
+      _id = current_config["id"]
+      old_audit = current_config["audit_trail"]
+      old_values = current_config["values"]
+      current_version = current_config["highest_version"] + 1
 
-      old_values = r.table("config_values").get_all("{}-{}".format(user_id, config_name), index="config_id").run(db.conn)
-      old_values = list(old_values)
-
-      _id = None
-      old_audit = []
-      if not old_values:
-        old_values = []
-      else:
-        old_config = old_values[0]
-        _id = old_config["id"]
-        old_audit = old_config["audit_trail"]
-        old_values = old_config["values"]
-
-      if not _id:
-        response = r.table("config_values").insert({
-          "config_id": "{}-{}".format(user_id, config_name),
-          "version": current_version,
-          "values": values,
-          "audit_trail": [self._create_audit(old_values, values, current_version)]
+      new_audit = self._create_audit(old_values, values, current_version)
+      if new_audit["changes"]:
+        return r.table("config").get(_id).update({
+          "version": r.row["highest_version"] + 1,
+          "last_version": r.row["version"],
+          "highest_version": r.row["highest_version"] + 1,
+          "values": r.literal(values),
+          "audit_trail": r.row["audit_trail"].default([]).append(new_audit)
         }).run(db.conn)
       else:
-        new_audit = self._create_audit(old_values, values, current_version)
-        if new_audit["changes"]:
-          old_audit.append(new_audit)
-          response = r.table("config_values").get(_id).update({
-            "version": current_version,
-            "values": r.literal(values),
-            "audit_trail": r.doc["audit_trail"].default([]).append(new_audit)
-          }).run(db.conn)
-
-          r.table("config").get_all("{}-{}".format(user_id, config_name), index="name").update({
-            "highest_version": r.row["highest_version"] + 1,
-            "current_version": r.row["highest_version"] + 1
-          }).run(db.conn)
-        else:
-          return "No Change"
-
-      return response
+        return "No Change"
+    else:
+      return r.table("config").insert({
+        "name": "{}-{}".format(user_id, config_name),
+        "version": 0,
+        "highest_version": 0,
+        "last_version": 0,
+        "values": values,
+        "audit_trail": [self._create_audit({}, values, 0)]
+      }).run(db.conn)
 
   def _create_audit(self, old_values, new_values, version):
     audit_values = []
@@ -98,10 +58,14 @@ class ConfigValues(Resource):
       else:
         audit_values.append({"key": k, "action": "removed"})
 
-    new_keys = set(new_values.keys()).difference(set(old_values))
+    new_keys = set(new_values.keys()).difference(set(old_values.keys()))
 
     for k in new_keys:
-      audit_values.append({"key": k, "action": "added", "value": new_keys[k]})
+      audit_values.append({
+        "key": k, 
+        "action": "added", 
+        "value": new_values[k]
+      })
 
     return {"created_at": r.now(), "changes": audit_values, "version": version}
 

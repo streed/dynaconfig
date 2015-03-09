@@ -10,6 +10,5 @@ db = RethinkDB()
 db.init_app(app)
 
 
-from dynaconfig.endpoints import Config, ConfigValues
+from dynaconfig.endpoints import Config
 api.add_resource(Config, "/config/<int:user_id>/<string:config_name>")
-api.add_resource(ConfigValues, "/values/<int:user_id>/<string:config_name>")
