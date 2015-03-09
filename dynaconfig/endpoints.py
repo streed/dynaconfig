@@ -54,7 +54,6 @@ class ConfigValues(Resource):
 
 
       old_values = r.table("config_values").get_all("{}-{}".format(user_id, config_name), index="config_id").run(db.conn)
-
       old_values = list(old_values)
 
       _id = None
@@ -81,7 +80,7 @@ class ConfigValues(Resource):
           response = r.table("config_values").get(_id).update({
             "version": current_version,
             "values": r.literal(values),
-            "audit_trail": old_audit
+            "audit_trail": r.doc["audit_trail"].default([]).append(new_audit)
           }).run(db.conn)
 
           r.table("config").get_all("{}-{}".format(user_id, config_name), index="name").update({
