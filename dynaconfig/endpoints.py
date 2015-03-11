@@ -80,15 +80,20 @@ class RevertConfig(Resource):
     if current_config:
       current_config = current_config[0]
 
-      if 0 <= version <= current_config["highest_version"]:
+      if 0 <= version < current_config["highest_version"]:
         pass
       else:
         return abort(404, message="Version={} for config with name='{}' for user id={} could not be found".format(version, config_name, user_id))
     else:
       return abort(404, message="Could not find config with name='{}' for user id={}".format(config_name, user_id))
 
-  def _revert_config(self, config, audits, expected_version):
-    changes =[a for audit_map in map(lambda audit: audit["changes"] if audit["version"] > expected_version else [], audits) for a in audit_map]
+  def _revert_config(self, config, audits, current_version, expected_version):
+    assert(not current_version == expected_version)
+
+    if current_version > expected_version:
+      changes =[a for audit_map in map(lambda audit: audit["changes"] if audit["version"] > expected_version else [], audits) for a in audit_map]
+    elif expected_version > current_config:
+      changes =[a for audit_map in map(lambda audit: audit["changes"] if audit["version"] < expected_version else [], audits) for a in audit_map]
 
     for change in changes:
       action = change["action"]
