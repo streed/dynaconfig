@@ -15,6 +15,8 @@ class Config(Resource):
 
     if current_config:
       return current_config[0]
+    else:
+      return abort(404, message="Could not find config with name='{}' for user id={}".format(config_name, user_id))
 
   def post(self, user_id, config_name):
     values = request.json
@@ -39,7 +41,7 @@ class Config(Resource):
           "audit_trail": r.row["audit_trail"].default([]).append(new_audit)
         }).run(db.conn)
       else:
-        return "No Change"
+        return abort(302, message="Config did not change")
     else:
       return r.table("config").insert({
         "name": "{}-{}".format(user_id, config_name),
@@ -58,7 +60,7 @@ class Config(Resource):
         if old_values[k] != new_values[k]:
           audit_values.append({"key": k, "action": "updated", "value": new_values[k]})
       else:
-        audit_values.append({"key": k, "action": "removed"})
+        audit_values.append({"key": k, "action": "removed", "value": old_values[k]})
 
     new_keys = set(new_values.keys()).difference(set(old_values.keys()))
 
@@ -70,4 +72,32 @@ class Config(Resource):
       })
 
     return {"created_at": int(time() * 1000), "changes": audit_values, "version": version}
+
+class RevertConfig(Resource):
+
+  def put(self, user_id, config_name, version):
+    current_config = list(r.table("config").get_all("{}-{}".format(user_id, config_name), index="name").run(db.conn))
+    if current_config:
+      current_config = current_config[0]
+
+      if 0 <= version <= current_config["highest_version"]:
+        pass
+      else:
+        return abort(404, message="Version={} for config with name='{}' for user id={} could not be found".format(version, config_name, user_id))
+    else:
+      return abort(404, message="Could not find config with name='{}' for user id={}".format(config_name, user_id))
+
+  def _revert_config(self, config, audits, expected_version):
+    changes =[a for audit_map in map(lambda audit: audit["changes"] if audit["version"] > expected_version else [], audits) for a in audit_map]
+
+    for change in changes:
+      action = change["action"]
+      key = change["key"]
+      value = change["value"]
+      if action in ["updated", "removed"]:
+        config[key] = value
+      elif action == "added":
+        del config[key]
+
+    return config
 
