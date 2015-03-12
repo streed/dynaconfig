@@ -8,10 +8,13 @@ from dynaconfig import db
 
 from time import time
 
+def config_id(user_id, config_name):
+  return "{}-{}".format(user_id, config_name)
+
 class Config(Resource):
 
   def get(self, user_id, config_name):
-    current_config = list(r.table("config").get_all("{}-{}".format(user_id, config_name), index="name").run(db.conn))
+    current_config = list(r.table("config").get_all(config_id(user_id, config_name), index="name").run(db.conn))
 
     if current_config:
       return current_config[0]
@@ -21,7 +24,7 @@ class Config(Resource):
   def post(self, user_id, config_name):
     values = request.json
 
-    current_config = list(r.table("config").get_all("{}-{}".format(user_id, config_name), index="name").run(db.conn))
+    current_config = list(r.table("config").get_all(config_id(user_id, config_name), index="name").run(db.conn))
     if current_config:
       current_config = current_config[0]
       old_audit = current_config["values"]
@@ -76,7 +79,7 @@ class Config(Resource):
 class RevertConfig(Resource):
 
   def put(self, user_id, config_name, version):
-    current_config = list(r.table("config").get_all("{}-{}".format(user_id, config_name), index="name").run(db.conn))
+    current_config = list(r.table("config").get_all(config_id(user_id, config_name), index="name").run(db.conn))
     if current_config:
       current_config = current_config[0]
 
@@ -91,9 +94,9 @@ class RevertConfig(Resource):
     assert(not current_version == expected_version)
 
     if current_version > expected_version:
-      changes =[a for audit_map in map(lambda audit: audit["changes"] if audit["version"] > expected_version else [], audits) for a in audit_map]
-    elif expected_version > current_config:
-      changes =[a for audit_map in map(lambda audit: audit["changes"] if audit["version"] < expected_version else [], audits) for a in audit_map]
+      changes = reversed([a for audit_map in map(lambda audit: audit["changes"] if audit["version"] >= expected_version else [], audits) for a in audit_map])
+    elif expected_version > current_version:
+      changes =[a for audit_map in map(lambda audit: audit["changes"] if audit["version"] <= expected_version else [], audits) for a in audit_map]
 
     for change in changes:
       action = change["action"]
@@ -102,7 +105,10 @@ class RevertConfig(Resource):
       if action in ["updated", "removed"]:
         config[key] = value
       elif action == "added":
-        del config[key]
+        if expected_version == 0:
+          config[key] = value
+        else:
+          del config[key]
 
     return config
 
