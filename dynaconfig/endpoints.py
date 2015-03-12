@@ -83,8 +83,15 @@ class RevertConfig(Resource):
     if current_config:
       current_config = current_config[0]
 
-      if 0 <= version < current_config["highest_version"]:
-        pass
+      if 0 <= version <= current_config["highest_version"]:
+        current_version = current_config["version"]
+        audit_trail = current_config["audit_trail"]
+        values = self._revert_config(current_config["values"], audit_trail, version, current_version)
+        return r.table("config").get(_id).update({
+          "version": version,
+          "last_version": r.row["version"],
+          "values": r.literal(values)
+        }).run(db.conn)
       else:
         return abort(404, message="Version={} for config with name='{}' for user id={} could not be found".format(version, config_name, user_id))
     else:
