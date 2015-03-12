@@ -1,32 +1,34 @@
 import datetime
 import rethinkdb as r
 
-from flask import request
+from flask import request, g
 from flask.ext.restful import Resource, abort
 
-from dynaconfig import db
+from dynaconfig import db, auth
 
 from time import time
 
-def config_id(user_id, config_name):
-  return "{}-{}".format(user_id, config_name)
+def config_id(config_name, config_environment):
+
+  return "{}-{}-{}".format(g.user.id, config_name, config_environment)
 
 class Config(Resource):
 
-  def get(self, user_id, config_name):
-    current_config = list(r.table("config").get_all(config_id(user_id, config_name), index="name").run(db.conn))
+  decorators = [auth.login_required]
+
+  def get(self, config_name, config_environment):
+    current_config = r.table("config").get(config_id(config_name, config_environment)).run(db.conn)
 
     if current_config:
-      return current_config[0]
+      return current_config
     else:
-      return abort(404, message="Could not find config with name='{}' for user id={}".format(config_name, user_id))
+      return abort(404, message="Could not find config with name='{}' for user id={}".format(config_environment, config_name))
 
-  def post(self, user_id, config_name):
+  def post(self, config_name, config_environment):
     values = request.json
 
-    current_config = list(r.table("config").get_all(config_id(user_id, config_name), index="name").run(db.conn))
+    current_config = r.table("config").get(config_id(config_name, config_environment)).run(db.conn)
     if current_config:
-      current_config = current_config[0]
       old_audit = current_config["values"]
 
       _id = current_config["id"]
@@ -47,7 +49,7 @@ class Config(Resource):
         return abort(302, message="Config did not change")
     else:
       return r.table("config").insert({
-        "name": "{}-{}".format(user_id, config_name),
+        "id": config_id(config_name, config_environment),
         "version": 0,
         "highest_version": 0,
         "last_version": 0,
@@ -78,12 +80,11 @@ class Config(Resource):
 
 class RevertConfig(Resource):
 
-  def put(self, user_id, config_name, version):
-    current_config = list(r.table("config").get_all(config_id(user_id, config_name), index="name").run(db.conn))
-    if current_config:
-      current_config = current_config[0]
+  decorators = [auth.login_required]
 
-      if 0 <= version <= current_config["highest_version"]:
+  def put(self, config_name, config_environment, version):
+    current_config = r.table("config").get(config_id(config_name, config_environment)).run(db.conn)
+    if current_config:
         current_version = current_config["version"]
         audit_trail = current_config["audit_trail"]
         values = self._revert_config(current_config["values"], audit_trail, version, current_version)
@@ -93,9 +94,9 @@ class RevertConfig(Resource):
           "values": r.literal(values)
         }).run(db.conn)
       else:
-        return abort(404, message="Version={} for config with name='{}' for user id={} could not be found".format(version, config_name, user_id))
+        return abort(404, message="Version={} for config with name='{}' for user id={} could not be found".format(version, config_environment, config_name))
     else:
-      return abort(404, message="Could not find config with name='{}' for user id={}".format(config_name, user_id))
+      return abort(404, message="Could not find config with name='{}' for user id={}".format(config_environment, config_name))
 
   def _revert_config(self, config, audits, current_version, expected_version):
     assert(not current_version == expected_version)

@@ -55,3 +55,6 @@ target/
 
 # Virtualenv 
 localenv/
+
+# Sqllite
+db.sqlite
